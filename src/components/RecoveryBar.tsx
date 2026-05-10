@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Colors } from './Colors';
 
 interface RecoveryBarProps {
@@ -11,26 +10,27 @@ interface RecoveryBarProps {
 }
 
 export function RecoveryBar({ label, progress, remainingHours, color }: RecoveryBarProps) {
-  const width = useSharedValue(0);
-
-  React.useEffect(() => {
-    width.value = withTiming(progress, { duration: 800 });
-  }, [progress]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    width: `${width.value * 100}%`,
-  }));
+  const clamped = Math.min(Math.max(progress, 0), 1);
+  const widthPercent = Math.round(clamped * 100);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.label}>{label}</Text>
-        <Text style={styles.hours}>
-          {remainingHours === 0 ? 'Ready' : `${remainingHours}h`}
+        <Text style={[styles.hours, remainingHours === 0 && { color: Colors.success }]}>
+          {remainingHours === 0 ? 'Ready' : `${remainingHours}h left`}
         </Text>
       </View>
       <View style={styles.track}>
-        <Animated.View style={[styles.fill, { backgroundColor: color }, animatedStyle]} />
+        <View
+          style={[
+            styles.fill,
+            {
+              backgroundColor: color,
+              width: `${widthPercent}%`,
+            },
+          ]}
+        />
       </View>
     </View>
   );
@@ -38,11 +38,12 @@ export function RecoveryBar({ label, progress, remainingHours, color }: Recovery
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
   },
   label: {
@@ -53,6 +54,7 @@ const styles = StyleSheet.create({
   hours: {
     color: Colors.textSecondary,
     fontSize: 12,
+    fontWeight: '500',
   },
   track: {
     height: 6,

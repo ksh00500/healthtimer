@@ -12,18 +12,34 @@ interface CircleTimerProps {
   onPress?: () => void;
 }
 
-const SIZE = 140;
-const STROKE = 6;
-const RADIUS = (SIZE - STROKE) / 2;
+const SIZE = 130;
+const STROKE = 7;
+const RADIUS = (SIZE - STROKE * 2) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function CircleTimer({ label, displayHours, progress, color, isRecovered, onPress }: CircleTimerProps) {
-  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
-  const bgColor = isRecovered ? `${color}22` : Colors.surface;
+export function CircleTimer({
+  label,
+  displayHours,
+  progress,
+  color,
+  isRecovered,
+  onPress,
+}: CircleTimerProps) {
+  const clamped = Math.min(Math.max(progress, 0), 1);
+  const strokeDashoffset = CIRCUMFERENCE * (1 - clamped);
 
   return (
-    <TouchableOpacity style={[styles.wrapper, { backgroundColor: bgColor }]} onPress={onPress} activeOpacity={0.8}>
-      <Svg width={SIZE} height={SIZE} style={styles.svg}>
+    <TouchableOpacity
+      style={[styles.wrapper, isRecovered && { backgroundColor: `${color}18` }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Svg
+        width={SIZE}
+        height={SIZE}
+        style={styles.svg}
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+      >
         <Circle
           cx={SIZE / 2}
           cy={SIZE / 2}
@@ -39,7 +55,7 @@ export function CircleTimer({ label, displayHours, progress, color, isRecovered,
           stroke={color}
           strokeWidth={STROKE}
           fill="transparent"
-          strokeDasharray={CIRCUMFERENCE}
+          strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
           rotation="-90"
@@ -47,10 +63,14 @@ export function CircleTimer({ label, displayHours, progress, color, isRecovered,
         />
       </Svg>
       <View style={styles.content}>
-        <Text style={styles.hours}>
-          {isRecovered ? '✓' : displayHours}
-          {!isRecovered && <Text style={styles.hUnit}>h</Text>}
-        </Text>
+        {isRecovered ? (
+          <Text style={[styles.checkmark, { color }]}>✓</Text>
+        ) : (
+          <View style={styles.hoursRow}>
+            <Text style={styles.hours}>{displayHours}</Text>
+            <Text style={styles.hUnit}>h</Text>
+          </View>
+        )}
         <Text style={[styles.label, { color }]}>{label.toUpperCase()}</Text>
       </View>
     </TouchableOpacity>
@@ -64,28 +84,43 @@ const styles = StyleSheet.create({
     borderRadius: SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.surface,
     position: 'relative',
   },
   svg: {
     position: 'absolute',
+    top: 0,
+    left: 0,
   },
   content: {
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   hours: {
     color: Colors.text,
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '700',
+    lineHeight: 36,
   },
   hUnit: {
-    fontSize: 16,
-    fontWeight: '400',
     color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '400',
+    marginLeft: 1,
+  },
+  checkmark: {
+    fontSize: 30,
+    fontWeight: '700',
+    lineHeight: 36,
   },
   label: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 1,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
     marginTop: 2,
   },
 });

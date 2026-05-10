@@ -3,31 +3,24 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from './Colors';
 
 interface StatCardProps {
-  icon: string;
   label: string;
   value: string | number;
   unit: string;
   target?: string;
   color?: string;
+  iconName?: string;
 }
 
-export function StatCard({ icon, label, value, unit, target, color = Colors.primary }: StatCardProps) {
+export function StatCard({ label, value, unit, target, color = Colors.primary }: StatCardProps) {
   return (
     <View style={styles.card}>
-      <View style={[styles.iconWrapper, { backgroundColor: `${color}22` }]}>
-        <Text style={styles.icon}>{icon}</Text>
-      </View>
+      <View style={[styles.dot, { backgroundColor: color }]} />
       <Text style={styles.label}>{label}</Text>
       <View style={styles.valueRow}>
         <Text style={[styles.value, { color }]}>{value}</Text>
-        {target ? (
-          <Text style={styles.target}>
-            <Text style={styles.unit}> {unit}</Text>/{target}
-          </Text>
-        ) : (
-          <Text style={styles.unit}> {unit}</Text>
-        )}
+        <Text style={styles.unit}> {unit}</Text>
       </View>
+      {target ? <Text style={styles.target}>Goal: {target}</Text> : null}
     </View>
   );
 }
@@ -41,36 +34,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  iconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     marginBottom: 10,
-  },
-  icon: {
-    fontSize: 18,
   },
   label: {
     color: Colors.textSecondary,
     fontSize: 12,
-    marginBottom: 4,
+    fontWeight: '500',
+    marginBottom: 6,
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   value: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '700',
   },
   unit: {
     color: Colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
   },
   target: {
-    color: Colors.textSecondary,
-    fontSize: 12,
+    color: Colors.textMuted,
+    fontSize: 11,
+    marginTop: 4,
   },
 });

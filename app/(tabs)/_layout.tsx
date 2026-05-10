@@ -1,25 +1,38 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/components/Colors';
 
-function TabIcon({ focused, icon, label }: { focused: boolean; icon: string; label: string }) {
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function TabIcon({
+  focused,
+  iconOn,
+  iconOff,
+  label,
+}: {
+  focused: boolean;
+  iconOn: IoniconName;
+  iconOff: IoniconName;
+  label: string;
+}) {
+  const color = focused ? Colors.tabBarActive : Colors.tabBarInactive;
   return (
     <View style={styles.tabItem}>
-      <Text style={[styles.tabIcon, { color: focused ? Colors.tabBarActive : Colors.tabBarInactive }]}>
-        {icon}
-      </Text>
-      <Text style={[styles.tabLabel, { color: focused ? Colors.tabBarActive : Colors.tabBarInactive }]}>
-        {label}
-      </Text>
+      <Ionicons name={focused ? iconOn : iconOff} size={22} color={color} />
+      <Text style={[styles.tabLabel, { color }]}>{label}</Text>
     </View>
   );
 }
 
-function AddButton({ onPress }: { onPress?: () => void }) {
+function AddTabIcon() {
   return (
-    <TouchableOpacity style={styles.addButton} onPress={onPress}>
-      <Text style={styles.addIcon}>+</Text>
-    </TouchableOpacity>
+    <View style={styles.addWrapper}>
+      <View style={styles.addCircle}>
+        <Ionicons name="add" size={32} color="#FFFFFF" />
+      </View>
+    </View>
   );
 }
 
@@ -35,32 +48,49 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="⌂" label="Home" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} iconOn="home" iconOff="home-outline" label="Home" />
+          ),
         }}
       />
       <Tabs.Screen
         name="timers"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="⏱" label="Timers" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} iconOn="timer" iconOff="timer-outline" label="Timers" />
+          ),
         }}
       />
       <Tabs.Screen
         name="add"
         options={{
-          tabBarIcon: () => <AddButton />,
-          tabBarStyle: { display: 'none' },
+          tabBarIcon: () => <AddTabIcon />,
         }}
       />
       <Tabs.Screen
         name="activity"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="📅" label="Activity" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              iconOn="calendar"
+              iconOff="calendar-outline"
+              label="Activity"
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon="👤" label="Profile" />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              iconOn="person"
+              iconOff="person-outline"
+              label="Profile"
+            />
+          ),
         }}
       />
     </Tabs>
@@ -72,38 +102,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.tabBar,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    height: 72,
-    paddingBottom: 8,
+    height: Platform.OS === 'ios' ? 84 : 68,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
   },
   tabItem: {
     alignItems: 'center',
-    gap: 2,
-  },
-  tabIcon: {
-    fontSize: 20,
+    justifyContent: 'center',
+    gap: 3,
+    paddingTop: 4,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: '500',
   },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.text,
+  addWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginTop: -16,
+  },
+  addCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  addIcon: {
-    fontSize: 28,
-    color: Colors.background,
-    fontWeight: '300',
-    lineHeight: 32,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
   },
 });
