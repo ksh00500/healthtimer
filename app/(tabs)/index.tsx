@@ -63,6 +63,9 @@ export default function DashboardScreen() {
     }
   }
 
+  const warningColor =
+    aiAnalysis ? (WARNING_COLORS[aiAnalysis.warningLevel] ?? Colors.success) : Colors.success;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -95,14 +98,14 @@ export default function DashboardScreen() {
         {aiAnalysis ? (
           <Card style={styles.statusCard}>
             <View style={styles.statusHeader}>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: WARNING_COLORS[aiAnalysis.warningLevel] ?? Colors.success },
-                ]}
-              />
+              <View style={[styles.statusDot, { backgroundColor: warningColor }]} />
               <Text style={styles.statusTag}>Today's Status</Text>
-              <TouchableOpacity onPress={runAnalysis} disabled={analyzing} style={styles.refreshBtn} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={runAnalysis}
+                disabled={analyzing}
+                style={styles.refreshBtn}
+                activeOpacity={0.7}
+              >
                 <Ionicons name="refresh" size={14} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -111,24 +114,14 @@ export default function DashboardScreen() {
             <View style={styles.divider} />
             <Text style={styles.recommendation}>{aiAnalysis.recommendation}</Text>
             {aiAnalysis.warningLevel !== 'none' && aiAnalysis.warningMessage ? (
-              <View
-                style={[
-                  styles.warningBox,
-                  { borderColor: WARNING_COLORS[aiAnalysis.warningLevel] },
-                ]}
-              >
+              <View style={[styles.warningBox, { borderColor: warningColor }]}>
                 <Ionicons
                   name="warning"
                   size={14}
-                  color={WARNING_COLORS[aiAnalysis.warningLevel]}
+                  color={warningColor}
                   style={{ marginRight: 6 }}
                 />
-                <Text
-                  style={[
-                    styles.warningText,
-                    { color: WARNING_COLORS[aiAnalysis.warningLevel] },
-                  ]}
-                >
+                <Text style={[styles.warningText, { color: warningColor }]}>
                   {aiAnalysis.warningMessage}
                 </Text>
               </View>
@@ -179,7 +172,9 @@ export default function DashboardScreen() {
           </Card>
         ) : (
           <Card style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Recovery</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Recovery</Text>
+            </View>
             <Text style={styles.emptySubtext}>
               No muscles tracked yet. Log a workout in the Add tab.
             </Text>

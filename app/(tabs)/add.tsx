@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../../src/store';
@@ -12,6 +19,12 @@ import { todayStr } from '../../src/utils/date';
 import { checkOvertrain, formatOvertainWarning } from '../../src/hooks/useOvertrain';
 
 type Tab = 'workout' | 'food' | 'sleep';
+
+const TAB_LABELS: Record<Tab, string> = {
+  workout: '운동',
+  food: '식단',
+  sleep: '수면',
+};
 
 export default function AddScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('workout');
@@ -26,37 +39,39 @@ export default function AddScreen() {
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
+            activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'workout' ? '🏋️ 운동' : tab === 'food' ? '🍎 식단' : '🌙 수면'}
+              {TAB_LABELS[tab]}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {activeTab === 'workout' && (
-        <WorkoutForm onSave={(log) => { addWorkoutLog(log); log.muscleGroups.forEach((g) => setMuscleWorked(g)); }} />
+        <WorkoutForm
+          onSave={(log) => {
+            addWorkoutLog(log);
+            log.muscleGroups.forEach((g) => setMuscleWorked(g));
+          }}
+        />
       )}
-      {activeTab === 'food' && (
-        <FoodForm onSave={addFoodLog} />
-      )}
-      {activeTab === 'sleep' && (
-        <SleepForm onSave={addSleepLog} />
-      )}
+      {activeTab === 'food' && <FoodForm onSave={addFoodLog} />}
+      {activeTab === 'sleep' && <SleepForm onSave={addSleepLog} />}
     </SafeAreaView>
   );
 }
 
-// ── Workout Form ────────────────────────────────────────────────────────────
+// ── Workout Form ──────────────────────────────────────────────────────────────
 function WorkoutForm({ onSave }: { onSave: (log: WorkoutLog) => void }) {
   const [selectedGroups, setSelectedGroups] = useState<MuscleGroup[]>([]);
   const [duration, setDuration] = useState('60');
   const [intensity, setIntensity] = useState<'light' | 'moderate' | 'heavy'>('moderate');
-  const [exercises, setExercises] = useState<{ name: string; reps: string; weight: string }[]>([
-    { name: '', reps: '10', weight: '60' },
-  ]);
+  const [exercises, setExercises] = useState([{ name: '', reps: '10', weight: '60' }]);
   const [notes, setNotes] = useState('');
   const { muscleTimers, profile } = useAppStore();
+
+  const orderedGroups: MuscleGroup[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 
   function toggleGroup(group: MuscleGroup) {
     setSelectedGroups((prev) =>
@@ -64,22 +79,30 @@ function WorkoutForm({ onSave }: { onSave: (log: WorkoutLog) => void }) {
     );
   }
 
+  function updateExercise(index: number, field: 'name' | 'reps' | 'weight', value: string) {
+    setExercises((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  }
+
+  function addExercise() {
+    setExercises((prev) => [...prev, { name: '', reps: '10', weight: '60' }]);
+  }
+
   function handleSave() {
     if (selectedGroups.length === 0) {
-      Alert.alert('근육 부위를 선택해주세요');
+      Alert.alert('Missing Info', 'Please select at least one muscle group.');
       return;
     }
 
     const warnings = checkOvertrain(selectedGroups, muscleTimers, profile);
     if (warnings.length > 0) {
-      Alert.alert(
-        '⚠ 과훈련 경고',
-        formatOvertainWarning(warnings),
-        [
-          { text: '취소', style: 'cancel' },
-          { text: '계속 진행', style: 'destructive', onPress: () => doSave() },
-        ]
-      );
+      Alert.alert('Overtraining Warning', formatOvertainWarning(warnings), [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', style: 'destructive', onPress: doSave },
+      ]);
       return;
     }
     doSave();
@@ -95,141 +118,148 @@ function WorkoutForm({ onSave }: { onSave: (log: WorkoutLog) => void }) {
       date: todayStr(),
       muscleGroups: selectedGroups,
       durationMinutes: Number(duration) || 60,
-      exercises: exercises.filter((e) => e.name).map((e, i) => ({
-        id: `${Date.now()}-${i}`,
-        name: e.name,
-        muscleGroup: selectedGroups[0],
-        sets: [{ reps: Number(e.reps) || 0, weight: Number(e.weight) || 0 }],
-      })),
+      exercises: exercises
+        .filter((e) => e.name.trim())
+        .map((e, i) => ({
+          id: `${Date.now()}-${i}`,
+          name: e.name,
+          muscleGroup: selectedGroups[0],
+          sets: [{ reps: Number(e.reps) || 0, weight: Number(e.weight) || 0 }],
+        })),
       totalVolume,
       notes,
       intensity,
     };
     onSave(log);
-    Alert.alert('✓ 운동 기록 완료', '회복 타이머가 시작되었습니다.');
+    Alert.alert('Saved', 'Workout logged. Recovery timers have started.');
     setSelectedGroups([]);
     setExercises([{ name: '', reps: '10', weight: '60' }]);
     setNotes('');
+    setDuration('60');
   }
 
-  const orderedGroups: MuscleGroup[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
-
   return (
-    <ScrollView style={styles.form} contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.sectionLabel}>근육 부위</Text>
-      <View style={styles.muscleGrid}>
-        {orderedGroups.map((group) => {
-          const def = MUSCLE_DEFAULTS[group];
-          const selected = selectedGroups.includes(group);
-          return (
+    <KeyboardAvoidingView
+      style={styles.kav}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        style={styles.form}
+        contentContainerStyle={styles.formContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.sectionLabel}>Muscle Groups</Text>
+        <View style={styles.muscleGrid}>
+          {orderedGroups.map((group) => {
+            const def = MUSCLE_DEFAULTS[group];
+            const isSelected = selectedGroups.includes(group);
+            return (
+              <TouchableOpacity
+                key={group}
+                style={[
+                  styles.muscleChip,
+                  isSelected && { backgroundColor: def.color, borderColor: def.color },
+                ]}
+                onPress={() => toggleGroup(group)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[styles.muscleChipText, isSelected && { color: Colors.background }]}
+                >
+                  {def.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.sectionLabel}>Duration (minutes)</Text>
+        <TextInput
+          style={styles.input}
+          value={duration}
+          onChangeText={setDuration}
+          keyboardType="number-pad"
+          placeholderTextColor={Colors.textMuted}
+          placeholder="60"
+        />
+
+        <Text style={styles.sectionLabel}>Intensity</Text>
+        <View style={styles.rowBtns}>
+          {(['light', 'moderate', 'heavy'] as const).map((lvl) => (
             <TouchableOpacity
-              key={group}
-              style={[styles.muscleChip, selected && { backgroundColor: def.color, borderColor: def.color }]}
-              onPress={() => toggleGroup(group)}
+              key={lvl}
+              style={[styles.rowBtn, intensity === lvl && styles.rowBtnActive]}
+              onPress={() => setIntensity(lvl)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.muscleChipText, selected && { color: Colors.background }]}>
-                {def.label}
+              <Text style={[styles.rowBtnText, intensity === lvl && styles.rowBtnTextActive]}>
+                {lvl === 'light' ? 'Light' : lvl === 'moderate' ? 'Moderate' : 'Heavy'}
               </Text>
             </TouchableOpacity>
-          );
-        })}
-      </View>
+          ))}
+        </View>
 
-      <Text style={styles.sectionLabel}>운동 시간 (분)</Text>
-      <TextInput
-        style={styles.input}
-        value={duration}
-        onChangeText={setDuration}
-        keyboardType="number-pad"
-        placeholderTextColor={Colors.textMuted}
-      />
-
-      <Text style={styles.sectionLabel}>운동 강도</Text>
-      <View style={styles.intensityRow}>
-        {(['light', 'moderate', 'heavy'] as const).map((lvl) => (
-          <TouchableOpacity
-            key={lvl}
-            style={[styles.intensityBtn, intensity === lvl && styles.intensityActive]}
-            onPress={() => setIntensity(lvl)}
-          >
-            <Text style={[styles.intensityText, intensity === lvl && styles.intensityTextActive]}>
-              {lvl === 'light' ? '가벼움' : lvl === 'moderate' ? '보통' : '강함'}
-            </Text>
-          </TouchableOpacity>
+        <Text style={styles.sectionLabel}>Exercises</Text>
+        {exercises.map((ex, i) => (
+          <Card key={i} style={styles.exerciseCard}>
+            <TextInput
+              style={styles.exerciseNameInput}
+              value={ex.name}
+              onChangeText={(v) => updateExercise(i, 'name', v)}
+              placeholder="Exercise name (e.g. Bench Press)"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <View style={styles.exerciseRow}>
+              <View style={styles.exerciseField}>
+                <Text style={styles.exerciseFieldLabel}>Reps</Text>
+                <TextInput
+                  style={styles.exerciseFieldInput}
+                  value={ex.reps}
+                  onChangeText={(v) => updateExercise(i, 'reps', v)}
+                  keyboardType="number-pad"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+              <View style={styles.exerciseField}>
+                <Text style={styles.exerciseFieldLabel}>Weight (kg)</Text>
+                <TextInput
+                  style={styles.exerciseFieldInput}
+                  value={ex.weight}
+                  onChangeText={(v) => updateExercise(i, 'weight', v)}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+            </View>
+          </Card>
         ))}
+        <TouchableOpacity style={styles.addExerciseBtn} onPress={addExercise} activeOpacity={0.7}>
+          <Text style={styles.addExerciseBtnText}>+ Add Exercise</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionLabel}>Notes</Text>
+        <TextInput
+          style={[styles.input, styles.notesInput]}
+          value={notes}
+          onChangeText={setNotes}
+          multiline
+          placeholder="Workout notes..."
+          placeholderTextColor={Colors.textMuted}
+          textAlignVertical="top"
+        />
+      </ScrollView>
+
+      <View style={styles.saveBtnWrapper}>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.7}>
+          <Text style={styles.saveBtnText}>Save Workout</Text>
+        </TouchableOpacity>
       </View>
-
-      <Text style={styles.sectionLabel}>운동 목록</Text>
-      {exercises.map((ex, i) => (
-        <Card key={i} style={styles.exerciseCard}>
-          <TextInput
-            style={styles.exerciseNameInput}
-            value={ex.name}
-            onChangeText={(v) => {
-              const next = [...exercises];
-              next[i].name = v;
-              setExercises(next);
-            }}
-            placeholder="운동 이름 (예: 벤치프레스)"
-            placeholderTextColor={Colors.textMuted}
-          />
-          <View style={styles.exerciseRow}>
-            <View style={styles.exerciseField}>
-              <Text style={styles.exerciseFieldLabel}>횟수</Text>
-              <TextInput
-                style={styles.exerciseFieldInput}
-                value={ex.reps}
-                onChangeText={(v) => {
-                  const next = [...exercises];
-                  next[i].reps = v;
-                  setExercises(next);
-                }}
-                keyboardType="number-pad"
-                placeholderTextColor={Colors.textMuted}
-              />
-            </View>
-            <View style={styles.exerciseField}>
-              <Text style={styles.exerciseFieldLabel}>무게 (kg)</Text>
-              <TextInput
-                style={styles.exerciseFieldInput}
-                value={ex.weight}
-                onChangeText={(v) => {
-                  const next = [...exercises];
-                  next[i].weight = v;
-                  setExercises(next);
-                }}
-                keyboardType="decimal-pad"
-                placeholderTextColor={Colors.textMuted}
-              />
-            </View>
-          </View>
-        </Card>
-      ))}
-      <TouchableOpacity
-        style={styles.addExerciseBtn}
-        onPress={() => setExercises([...exercises, { name: '', reps: '10', weight: '60' }])}
-      >
-        <Text style={styles.addExerciseBtnText}>+ 운동 추가</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionLabel}>메모</Text>
-      <TextInput
-        style={[styles.input, styles.notesInput]}
-        value={notes}
-        onChangeText={setNotes}
-        multiline
-        placeholder="오늘 운동 메모..."
-        placeholderTextColor={Colors.textMuted}
-      />
-
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-        <Text style={styles.saveBtnText}>운동 기록 저장</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-// ── Food Form ────────────────────────────────────────────────────────────────
+// ── Food Form ─────────────────────────────────────────────────────────────────
 function FoodForm({ onSave }: { onSave: (log: FoodLog) => void }) {
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>('lunch');
   const [foodName, setFoodName] = useState('');
@@ -238,9 +268,16 @@ function FoodForm({ onSave }: { onSave: (log: FoodLog) => void }) {
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
 
+  const MEAL_LABELS: Record<typeof mealType, string> = {
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    snack: 'Snack',
+  };
+
   function handleSave() {
-    if (!foodName || !calories) {
-      Alert.alert('음식 이름과 칼로리를 입력해주세요');
+    if (!foodName.trim() || !calories) {
+      Alert.alert('Missing Info', 'Please enter food name and calories.');
       return;
     }
     const cal = Number(calories) || 0;
@@ -252,24 +289,26 @@ function FoodForm({ onSave }: { onSave: (log: FoodLog) => void }) {
       id: Date.now().toString(),
       date: todayStr(),
       mealType,
-      foods: [{
-        id: Date.now().toString(),
-        name: foodName,
-        calories: cal,
-        protein: pro,
-        carbs: carb,
-        fat: f,
-        amount: 1,
-        unit: '인분',
-        isFavorite: false,
-      }],
+      foods: [
+        {
+          id: Date.now().toString(),
+          name: foodName,
+          calories: cal,
+          protein: pro,
+          carbs: carb,
+          fat: f,
+          amount: 1,
+          unit: 'serving',
+          isFavorite: false,
+        },
+      ],
       totalCalories: cal,
       totalProtein: pro,
       totalCarbs: carb,
       totalFat: f,
     };
     onSave(log);
-    Alert.alert('✓ 식단 기록 완료');
+    Alert.alert('Saved', 'Food log saved.');
     setFoodName('');
     setCalories('');
     setProtein('');
@@ -278,64 +317,111 @@ function FoodForm({ onSave }: { onSave: (log: FoodLog) => void }) {
   }
 
   return (
-    <ScrollView style={styles.form} contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.sectionLabel}>식사 종류</Text>
-      <View style={styles.mealRow}>
-        {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((m) => (
-          <TouchableOpacity
-            key={m}
-            style={[styles.mealBtn, mealType === m && styles.mealBtnActive]}
-            onPress={() => setMealType(m)}
-          >
-            <Text style={[styles.mealBtnText, mealType === m && styles.mealBtnTextActive]}>
-              {m === 'breakfast' ? '아침' : m === 'lunch' ? '점심' : m === 'dinner' ? '저녁' : '간식'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+    <KeyboardAvoidingView
+      style={styles.kav}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        style={styles.form}
+        contentContainerStyle={styles.formContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.sectionLabel}>Meal Type</Text>
+        <View style={styles.mealRow}>
+          {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[styles.mealBtn, mealType === m && styles.mealBtnActive]}
+              onPress={() => setMealType(m)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.mealBtnText, mealType === m && styles.mealBtnTextActive]}>
+                {MEAL_LABELS[m]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <Text style={styles.sectionLabel}>음식 이름</Text>
-      <TextInput
-        style={styles.input}
-        value={foodName}
-        onChangeText={setFoodName}
-        placeholder="예: 닭가슴살 샐러드"
-        placeholderTextColor={Colors.textMuted}
-      />
+        <Text style={styles.sectionLabel}>Food Name</Text>
+        <TextInput
+          style={styles.input}
+          value={foodName}
+          onChangeText={setFoodName}
+          placeholder="e.g. Chicken Salad"
+          placeholderTextColor={Colors.textMuted}
+        />
 
-      <View style={styles.nutritionGrid}>
-        {[
-          { label: '칼로리 (kcal)', value: calories, set: setCalories },
-          { label: '단백질 (g)', value: protein, set: setProtein },
-          { label: '탄수화물 (g)', value: carbs, set: setCarbs },
-          { label: '지방 (g)', value: fat, set: setFat },
-        ].map(({ label, value, set }) => (
-          <View key={label} style={styles.nutritionField}>
-            <Text style={styles.sectionLabel}>{label}</Text>
+        <Text style={styles.sectionLabel}>Nutrition</Text>
+        <View style={styles.nutritionGrid}>
+          <View style={styles.nutritionField}>
+            <Text style={styles.nutritionFieldLabel}>Calories (kcal)</Text>
             <TextInput
               style={styles.input}
-              value={value}
-              onChangeText={set}
+              value={calories}
+              onChangeText={setCalories}
               keyboardType="decimal-pad"
               placeholderTextColor={Colors.textMuted}
               placeholder="0"
             />
           </View>
-        ))}
-      </View>
+          <View style={styles.nutritionField}>
+            <Text style={styles.nutritionFieldLabel}>Protein (g)</Text>
+            <TextInput
+              style={styles.input}
+              value={protein}
+              onChangeText={setProtein}
+              keyboardType="decimal-pad"
+              placeholderTextColor={Colors.textMuted}
+              placeholder="0"
+            />
+          </View>
+          <View style={styles.nutritionField}>
+            <Text style={styles.nutritionFieldLabel}>Carbs (g)</Text>
+            <TextInput
+              style={styles.input}
+              value={carbs}
+              onChangeText={setCarbs}
+              keyboardType="decimal-pad"
+              placeholderTextColor={Colors.textMuted}
+              placeholder="0"
+            />
+          </View>
+          <View style={styles.nutritionField}>
+            <Text style={styles.nutritionFieldLabel}>Fat (g)</Text>
+            <TextInput
+              style={styles.input}
+              value={fat}
+              onChangeText={setFat}
+              keyboardType="decimal-pad"
+              placeholderTextColor={Colors.textMuted}
+              placeholder="0"
+            />
+          </View>
+        </View>
+      </ScrollView>
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-        <Text style={styles.saveBtnText}>식단 기록 저장</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      <View style={styles.saveBtnWrapper}>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.7}>
+          <Text style={styles.saveBtnText}>Save Food Log</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-// ── Sleep Form ───────────────────────────────────────────────────────────────
+// ── Sleep Form ────────────────────────────────────────────────────────────────
 function SleepForm({ onSave }: { onSave: (log: SleepLog) => void }) {
   const [totalHours, setTotalHours] = useState('7');
   const [deepHours, setDeepHours] = useState('1.5');
   const [quality, setQuality] = useState<'poor' | 'fair' | 'good' | 'excellent'>('good');
+
+  const QUALITY_LABELS: Record<typeof quality, string> = {
+    poor: 'Poor',
+    fair: 'Fair',
+    good: 'Good',
+    excellent: 'Excellent',
+  };
 
   function handleSave() {
     const log: SleepLog = {
@@ -348,136 +434,233 @@ function SleepForm({ onSave }: { onSave: (log: SleepLog) => void }) {
       quality,
     };
     onSave(log);
-    Alert.alert('✓ 수면 기록 완료');
+    Alert.alert('Saved', 'Sleep log saved.');
     setTotalHours('7');
     setDeepHours('1.5');
     setQuality('good');
   }
 
   return (
-    <ScrollView style={styles.form} contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
-      <Text style={styles.sectionLabel}>총 수면 시간 (시간)</Text>
-      <TextInput
-        style={styles.input}
-        value={totalHours}
-        onChangeText={setTotalHours}
-        keyboardType="decimal-pad"
-        placeholderTextColor={Colors.textMuted}
-      />
+    <KeyboardAvoidingView
+      style={styles.kav}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        style={styles.form}
+        contentContainerStyle={styles.formContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.sectionLabel}>Total Sleep (hours)</Text>
+        <TextInput
+          style={styles.input}
+          value={totalHours}
+          onChangeText={setTotalHours}
+          keyboardType="decimal-pad"
+          placeholderTextColor={Colors.textMuted}
+          placeholder="7"
+        />
 
-      <Text style={styles.sectionLabel}>깊은 수면 시간 (시간)</Text>
-      <TextInput
-        style={styles.input}
-        value={deepHours}
-        onChangeText={setDeepHours}
-        keyboardType="decimal-pad"
-        placeholderTextColor={Colors.textMuted}
-      />
+        <Text style={styles.sectionLabel}>Deep Sleep (hours)</Text>
+        <TextInput
+          style={styles.input}
+          value={deepHours}
+          onChangeText={setDeepHours}
+          keyboardType="decimal-pad"
+          placeholderTextColor={Colors.textMuted}
+          placeholder="1.5"
+        />
 
-      <Text style={styles.sectionLabel}>수면의 질</Text>
-      <View style={styles.qualityRow}>
-        {(['poor', 'fair', 'good', 'excellent'] as const).map((q) => (
-          <TouchableOpacity
-            key={q}
-            style={[styles.qualityBtn, quality === q && styles.qualityBtnActive]}
-            onPress={() => setQuality(q)}
-          >
-            <Text style={[styles.qualityText, quality === q && styles.qualityTextActive]}>
-              {q === 'poor' ? '😴 나쁨' : q === 'fair' ? '😐 보통' : q === 'good' ? '😊 좋음' : '🌟 최상'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <Text style={styles.sectionLabel}>Sleep Quality</Text>
+        <View style={styles.qualityGrid}>
+          {(['poor', 'fair', 'good', 'excellent'] as const).map((q) => (
+            <TouchableOpacity
+              key={q}
+              style={[styles.qualityBtn, quality === q && styles.qualityBtnActive]}
+              onPress={() => setQuality(q)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.qualityText, quality === q && styles.qualityTextActive]}>
+                {QUALITY_LABELS[q]}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      <View style={styles.saveBtnWrapper}>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.7}>
+          <Text style={styles.saveBtnText}>Save Sleep Log</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-        <Text style={styles.saveBtnText}>수면 기록 저장</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  tabBar: { flexDirection: 'row', padding: 16, gap: 8 },
+  kav: { flex: 1 },
+
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
   tab: {
-    flex: 1, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: Colors.surface, alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.border,
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   tabActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  tabText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
-  tabTextActive: { color: Colors.background },
+  tabText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  tabTextActive: { color: Colors.background, fontWeight: '700' },
 
   form: { flex: 1 },
-  formContent: { padding: 20, paddingBottom: 60 },
-  sectionLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 16 },
+  formContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 20 },
+
+  sectionLabel: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 16,
+  },
 
   muscleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   muscleChip: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  muscleChipText: { color: Colors.text, fontSize: 14 },
+  muscleChipText: { color: Colors.text, fontSize: 14, fontWeight: '500' },
 
   input: {
-    backgroundColor: Colors.surface, color: Colors.text, borderRadius: 12,
-    padding: 14, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    color: Colors.text,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  notesInput: { height: 80, textAlignVertical: 'top' },
+  notesInput: { height: 80 },
 
-  intensityRow: { flexDirection: 'row', gap: 8 },
-  intensityBtn: {
-    flex: 1, paddingVertical: 12, borderRadius: 12,
-    backgroundColor: Colors.surface, alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.border,
+  rowBtns: { flexDirection: 'row', gap: 8 },
+  rowBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  intensityActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  intensityText: { color: Colors.textSecondary, fontSize: 14 },
-  intensityTextActive: { color: Colors.background, fontWeight: '700' },
+  rowBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  rowBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '500' },
+  rowBtnTextActive: { color: Colors.background, fontWeight: '700' },
 
   exerciseCard: { marginBottom: 8, padding: 12 },
   exerciseNameInput: {
-    color: Colors.text, fontSize: 15, paddingBottom: 8,
-    borderBottomWidth: 1, borderBottomColor: Colors.border, marginBottom: 10,
+    color: Colors.text,
+    fontSize: 15,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: 10,
   },
   exerciseRow: { flexDirection: 'row', gap: 12 },
   exerciseField: { flex: 1 },
-  exerciseFieldLabel: { color: Colors.textSecondary, fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  exerciseFieldLabel: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   exerciseFieldInput: {
-    color: Colors.text, fontSize: 16, fontWeight: '600',
-    backgroundColor: Colors.surfaceElevated, padding: 10, borderRadius: 8,
-    borderWidth: 1, borderColor: Colors.border,
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: Colors.surfaceElevated,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
 
-  addExerciseBtn: { paddingVertical: 12, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: Colors.border, borderStyle: 'dashed', marginTop: 4 },
-  addExerciseBtnText: { color: Colors.textSecondary, fontSize: 14 },
+  addExerciseBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+    marginTop: 4,
+  },
+  addExerciseBtnText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '500' },
 
-  mealRow: { flexDirection: 'row', gap: 8 },
+  mealRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   mealBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: Colors.surface, alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.border,
+    flex: 1,
+    minWidth: 70,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   mealBtnActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  mealBtnText: { color: Colors.textSecondary, fontSize: 13 },
+  mealBtnText: { color: Colors.textSecondary, fontSize: 13, fontWeight: '500' },
   mealBtnTextActive: { color: Colors.background, fontWeight: '700' },
 
-  nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 0 },
-  nutritionField: { width: '50%', paddingRight: 8 },
+  nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  nutritionField: { width: '47%' },
+  nutritionFieldLabel: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginTop: 8,
+  },
 
-  qualityRow: { gap: 8 },
+  qualityGrid: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   qualityBtn: {
-    paddingVertical: 14, borderRadius: 12,
-    backgroundColor: Colors.surface, alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.border,
+    flex: 1,
+    minWidth: 80,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   qualityBtnActive: { backgroundColor: Colors.purple, borderColor: Colors.purple },
-  qualityText: { color: Colors.textSecondary, fontSize: 15 },
+  qualityText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '500' },
   qualityTextActive: { color: Colors.text, fontWeight: '700' },
 
+  saveBtnWrapper: {
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
   saveBtn: {
-    marginTop: 24, backgroundColor: Colors.primary,
-    paddingVertical: 18, borderRadius: 16, alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
   },
   saveBtnText: { color: Colors.background, fontSize: 17, fontWeight: '700' },
 });
