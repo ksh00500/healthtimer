@@ -1,27 +1,16 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
 import { useNotificationSetup } from '../src/hooks/useNotifications';
 
-function AppShell() {
+export default function RootLayout() {
   useNotificationSetup();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-    </Stack>
-  );
-}
-
-export default function RootLayout() {
-  return (
-    <GestureHandlerRootView style={styles.root}>
+    <>
       <StatusBar style="light" />
-      <AppShell />
-    </GestureHandlerRootView>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="index" />
+      </Stack>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-});
