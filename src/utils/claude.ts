@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { MuscleTimer, SleepLog, FoodLog, UserProfile, AiAnalysis } from '../types';
 import { getRecoveryHours, getRemainingHours } from './recovery';
 
@@ -9,8 +8,6 @@ export async function generateDailyAnalysis(
   foodLog: FoodLog | null,
   profile: UserProfile
 ): Promise<AiAnalysis> {
-  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-
   const timerSummary = muscleTimers.map((t) => {
     const remaining = getRemainingHours(t, profile);
     const total = getRecoveryHours(t, profile);
@@ -49,13 +46,27 @@ ${nutritionSummary}
   "warningMessage": "경고가 있다면 메시지 (없으면 빈 문자열)"
 }`;
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 512,
-    messages: [{ role: 'user', content: prompt }],
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 512,
+      messages: [{ role: 'user', content: prompt }],
+    }),
   });
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`API error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.[0]?.text ?? '';
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Invalid AI response format');
 
