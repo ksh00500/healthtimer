@@ -8,7 +8,6 @@ interface StatCardProps {
   unit: string;
   target?: string;
   color?: string;
-  iconName?: string;
 }
 
 export function StatCard({ label, value, unit, target, color = Colors.primary }: StatCardProps) {
